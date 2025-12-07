@@ -1,4 +1,2 @@
-README.md
-
 Hello, Welcome To "Ban-Others" Site, This maded for fun by the way, i Think You Enjoying from Our site, Enjoy!
 Note: This isn´t real Ban Simulator
