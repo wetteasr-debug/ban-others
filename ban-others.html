@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ban Section with @ and Custom Warnings</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  body { background-color: #36393f; color: #dcddde; display: flex; justify-content: center; align-items: flex-start; padding: 50px; }
+
+  .ban-section {
+    width: 400px;
+    background-color: #2f3136;
+    border: 1px solid #202225;
+    border-radius: 10px;
+    padding: 20px;
+    position: relative;
+  }
+
+  .ban-header {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+  }
+
+  .banned-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border-top: 1px solid #202225;
+    border-bottom: 1px solid #202225;
+    margin-bottom: 15px;
+  }
+
+  .banned-user {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    border-bottom: 1px solid #202225;
+    align-items: center;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: all 0.3s ease;
+  }
+
+  .banned-user.show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .username {
+    font-weight: bold;
+  }
+
+  .ban-button {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: #ff5555;
+    color: white;
+    cursor: pointer;
+  }
+
+  .add-section {
+    display: flex;
+    margin-top: 10px;
+  }
+
+  .add-section input {
+    flex: 1;
+    padding: 8px;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+    background-color: #40444b;
+    color: #dcddde;
+    margin-right: 10px;
+  }
+
+  .add-section button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    background-color: #7289da;
+    color: white;
+    cursor: pointer;
+  }
+
+  /* Warning message */
+  .warning {
+    color: #ff5555;
+    font-size: 14px;
+    margin-top: 5px;
+    display: none;
+    text-align: center;
+  }
+
+  /* Modal Styles */
+  .modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal-content {
+    background-color: #2f3136;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #202225;
+    text-align: center;
+    width: 300px;
+  }
+
+  .modal-buttons {
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .modal-buttons button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+  }
+
+  .confirm { background-color: #ff5555; }
+  .cancel { background-color: #7289da; }
+
+  /* Loading overlay */
+  .loading-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+  }
+
+  .spinner {
+    border: 5px solid #40444b;
+    border-top: 5px solid #7289da;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="ban-section">
+  <div class="ban-header">Banned Users</div>
+  <div class="banned-list" id="bannedList"></div>
+
+  <div class="add-section">
+    <input type="text" id="usernameInput" placeholder="Username to ban" value="@">
+    <button onclick="askBanUser()">Ban</button>
+  </div>
+
+  <div class="warning" id="warningMsg">Please enter a name!</div>
+
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<!-- Ban Confirmation Modal -->
+<div class="modal" id="confirmationModal">
+  <div class="modal-content">
+    <div id="modalText">Are you sure you want to ban this user?</div>
+    <div class="modal-buttons">
+      <button class="confirm" id="confirmBan">Yes, Ban</button>
+      <button class="cancel" id="cancelBan">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Unban Confirmation Modal -->
+<div class="modal" id="unbanModal">
+  <div class="modal-content">
+    <div id="unbanText">Are you sure you want to unban this user?</div>
+    <div class="modal-buttons">
+      <button class="confirm" id="confirmUnban">Yes, Unban</button>
+      <button class="cancel" id="cancelUnban">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const bannedListEl = document.getElementById('bannedList');
+  const usernameInput = document.getElementById('usernameInput');
+  const modal = document.getElementById('confirmationModal');
+  const confirmBanBtn = document.getElementById('confirmBan');
+  const cancelBanBtn = document.getElementById('cancelBan');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const warningMsg = document.getElementById('warningMsg');
+
+  const unbanModal = document.getElementById('unbanModal');
+  const unbanText = document.getElementById('unbanText');
+  const confirmUnbanBtn = document.getElementById('confirmUnban');
+  const cancelUnbanBtn = document.getElementById('cancelUnban');
+
+  let bannedUsers = [];
+  let pendingUser = '';
+  let pendingUnbanIndex = -1;
+
+  // Always keep @ at the start
+  usernameInput.addEventListener('keydown', (e) => {
+    if ((usernameInput.selectionStart === 0 && (e.key === "Backspace" || e.key === "Delete"))) {
+      e.preventDefault();
+    }
+  });
+  usernameInput.addEventListener('input', () => {
+    if (!usernameInput.value.startsWith('@')) {
+      usernameInput.value = '@' + usernameInput.value.replace(/^@+/, '');
+    }
+  });
+
+  function renderBannedList() {
+    bannedListEl.innerHTML = '';
+    bannedUsers.forEach((user, index) => {
+      const div = document.createElement('div');
+      div.classList.add('banned-user');
+      div.innerHTML = `
+        <span class="username">${user}</span>
+        <button class="ban-button" onclick="askUnbanUser(${index})">Unban</button>
+      `;
+      bannedListEl.appendChild(div);
+      setTimeout(() => div.classList.add('show'), 50);
+    });
+  }
+
+  function askBanUser() {
+    const username = usernameInput.value.trim();
+    if (username === '@') {
+      warningMsg.style.display = 'block';
+      setTimeout(() => warningMsg.style.display = 'none', 2000);
+      return;
+    }
+    if (bannedUsers.includes(username)) {
+      warningMsg.textContent = `${username} is already banned!`;
+      warningMsg.style.display = 'block';
+      setTimeout(() => {
+        warningMsg.style.display = 'none';
+        warningMsg.textContent = 'Please enter a name!';
+      }, 2000);
+      return;
+    }
+    pendingUser = username;
+    modal.style.display = 'flex';
+  }
+
+  function banUser() {
+    modal.style.display = 'none';
+    loadingOverlay.style.display = 'flex';
+    setTimeout(() => {
+      bannedUsers.push(pendingUser);
+      renderBannedList();
+      usernameInput.value = '@';
+      pendingUser = '';
+      loadingOverlay.style.display = 'none';
+    }, 1000);
+  }
+
+  // Custom unban modal
+  function askUnbanUser(index) {
+    pendingUnbanIndex = index;
+    unbanText.textContent = `Are you sure you want to unban ${bannedUsers[index]}?`;
+    unbanModal.style.display = 'flex';
+  }
+
+  function unbanUser() {
+    if (pendingUnbanIndex >= 0) {
+      bannedUsers.splice(pendingUnbanIndex, 1);
+      renderBannedList();
+      pendingUnbanIndex = -1;
+      unbanModal.style.display = 'none';
+    }
+  }
+
+  confirmBanBtn.addEventListener('click', banUser);
+  cancelBanBtn.addEventListener('click', () => {
+    modal.style.display = 'none';
+    pendingUser = '';
+  });
+
+  confirmUnbanBtn.addEventListener('click', unbanUser);
+  cancelUnbanBtn.addEventListener('click', () => {
+    pendingUnbanIndex = -1;
+    unbanModal.style.display = 'none';
+  });
+
+  renderBannedList();
+</script>
+
+</body>
+</html>
